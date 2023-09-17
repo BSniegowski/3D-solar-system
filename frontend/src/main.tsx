@@ -4,10 +4,13 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js'
 import AddPlanet from "./AddPlanet.tsx";
 import ReactDOM from "react-dom/client";
 import React from "react";
-import {getInitialPosition, orbitalPeriod, rotationIncrement} from "./utils";
+import {generateTexture, getInitialPosition, orbitalPeriod, rotationIncrement} from "./utils";
 
 
 const scene = new THREE.Scene()
+
+const spaceTexture = new THREE.TextureLoader().load('/background.jpg')
+scene.background = spaceTexture
 
 const camera = new THREE.PerspectiveCamera(
   75, window.innerWidth / window.innerHeight, 0.1, 1000)
@@ -25,18 +28,24 @@ renderer.setSize(window.innerWidth, window.innerHeight)
 camera.position.setZ(30)
 
 const geometry = new THREE.SphereGeometry(sunRadius, 32, 16)
-const material = new THREE.MeshStandardMaterial({color: 0xffffff, wireframe: true})
+const sunTexture = new THREE.TextureLoader().load('/sun.jpeg')
+const material = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  transparent: true,
+  emissiveMap: sunTexture,
+  emissive: 0xffffff,
+})
 const sun = new THREE.Mesh(geometry, material)
 scene.add(sun)
 
-const pointLight = new THREE.PointLight("#064cd5", 10, 0, 0)
+const pointLight = new THREE.PointLight("#ffffff", 10, 0, 0.1)
 pointLight.position.set(0, 0, 0)
-const ambientLight = new THREE.AmbientLight("#ff007f", 0.1)
+const ambientLight = new THREE.AmbientLight("#ffffff", 0.0000001)
 scene.add(pointLight, ambientLight)
 
-const lightHelper = new THREE.PointLightHelper(pointLight)
-const gridHelper = new THREE.GridHelper(100, 50)
-scene.add(lightHelper, gridHelper)
+// const lightHelper = new THREE.PointLightHelper(pointLight)
+// const gridHelper = new THREE.GridHelper(100, 50)
+// scene.add(lightHelper, gridHelper)
 
 const rotateSun = () => {
   requestAnimationFrame(rotateSun)
@@ -54,13 +63,19 @@ rotateSun()
 
 // list of [orbitRadius, planetRadius] for each planet
 let radiuses: number[][] = [[0, sunRadius]]
-export const addPlanet = () => {
+export const addPlanet = async () => {
 
   const planetRadius = Math.random() * 2 + 0.5
   const geometry = new THREE.SphereGeometry(planetRadius, 32, 16)
-  const material = new THREE.MeshStandardMaterial({color: 0xffffff, wireframe: true})
-  const planet = new THREE.Mesh(geometry, material)
+  const normalTexture = new THREE.TextureLoader().load('/normal.jpg')
+  const planetTexture = await generateTexture()
 
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: planetTexture,
+    normalMap: normalTexture,
+  })
+  const planet = new THREE.Mesh(geometry, material)
   let [x, y] = [0, 0]
   try {
     [x, y] = getInitialPosition(planetRadius, radiuses)
@@ -70,15 +85,16 @@ export const addPlanet = () => {
   }
   console.log("Planet Radius: ", planetRadius)
   console.log("Rotation increment: ", rotationIncrement(planetRadius))
-
-  radiuses.push([Math.sqrt(x ** 2 + y ** 2), planetRadius])
-  planet.position.set(x, y, 0)
-
   const orbitalRadius = Math.sqrt(x ** 2 + y ** 2)
+  radiuses.push([orbitalRadius, planetRadius])
+
+  planet.position.set(x, y, 0)
+  planet.castShadow = true
+
+  planet.receiveShadow = true
   const orbit = new THREE.Object3D()
   orbit.position.set(0, 0, 0)
   orbit.add(planet)
-
   const animate = () => {
     requestAnimationFrame(animate);
     // Update the moon's position along its orbit path
